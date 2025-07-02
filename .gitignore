@@ -1,207 +1,333 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[codz]
-*$py.class
+#Cost minimization
 
-# C extensions
-*.so
 
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+# Model
+model = gp.Model("Methanol_Cost_Minimization")
+# <insert model parameters here>
+#Sets
+countries = ["Russia", "Saoudi-Arabia", "USA", "Brazil", "Sweden", "China", "Chile", "Netherlands"]
+ports = ["Shanghai", "Singapore", "Shenzhen", "Busan", "Rotterdam", "Hamburg", "New York", "Durban"]
+resources = ["CH4", "H2", "CO2", "Biomass"]
+methods = ["Fossil", "Biomass", "Electric"]
 
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
-*.manifest
-*.spec
+C = countries
+K = ports
+R = resources
+P = methods
+R_prime = [r for r in R if r != "Biomass"]
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
+# Variables
+x = model.addVars(C, C, R, name="x", lb=0, ub=1)             
+M = model.addVars(C, P, name="M", lb=0)                    
+F = model.addVars(C, K, name="F", lb=0)                      
+Mi = model.addVars(C, name="Mi")
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py.cover
-.hypothesis/
-.pytest_cache/
-cover/
+# Objective Function
+model.setObjective(
+    gp.quicksum(c_ship[i, j, r] * X_param[i, r] * x[i, j, r] for i in C for j in C for r in R) +
+    gp.quicksum(c_prod[i, p] * M[i, p] for i in C for p in P) +
+    gp.quicksum(c_meoh[i, k] * F[i, k] for i in C for k in K),
+    GRB.MINIMIZE
+)
 
-# Translations
-*.mo
-*.pot
+#Setting x=0 for non transportable resources 
+for r in non_transportable_resources:
+    for i in C:
+        for j in C:
+            if i != j:
+                model.addConstr(x[i, j, r] == 0)
 
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
+# Constraints
+for j in C:
+    for r in R_prime:
+        model.addConstr(
+            X_param[j, r] + gp.quicksum(X_param[i, r] * x[i, j, r] for i in C) -
+            gp.quicksum(X_param[j, r] * x[j, i, r] for i in C) >=
+            gp.quicksum(lam[j, r, p] * M[j, p] for p in P if (j, r, p) in lam)
+        )
 
-# Flask stuff:
-instance/
-.webassets-cache
 
-# Scrapy stuff:
-.scrapy
+for i in C:
+    model.addConstr(
+        gp.quicksum(M[i, p] for p in P) == gp.quicksum(F[i, k] for k in K))
 
-# Sphinx documentation
-docs/_build/
 
-# PyBuilder
-.pybuilder/
-target/
+for k in K:
+    model.addConstr(gp.quicksum(F[i, k] for i in C) == D[k])
 
-# Jupyter Notebook
-.ipynb_checkpoints
+model.optimize()
 
-# IPython
-profile_default/
-ipython_config.py
 
-# pyenv
-#   For a library or package, you might want to ignore these files since the code is
-#   intended to run in multiple environments; otherwise, check them in:
-# .python-version
 
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
 
-# UV
-#   Similar to Pipfile.lock, it is generally recommended to include uv.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#uv.lock
 
-# poetry
-#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
-#poetry.lock
-#poetry.toml
 
-# pdm
-#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
-#   pdm recommends including project-wide configuration in pdm.toml, but excluding .pdm-python.
-#   https://pdm-project.org/en/latest/usage/project/#working-with-version-control
-#pdm.lock
-#pdm.toml
-.pdm-python
-.pdm-build/
+#Emission minimization
 
-# pixi
-#   Similar to Pipfile.lock, it is generally recommended to include pixi.lock in version control.
-#pixi.lock
-#   Pixi creates a virtual environment in the .pixi directory, just like venv module creates one
-#   in the .venv directory. It is recommended not to include this directory in version control.
-.pixi
 
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
-__pypackages__/
+# Model
+model = gp.Model("Methanol_Cost_Minimization")
+# <insert model parameters here>
+#Sets
+countries = ["Russia", "Saoudi-Arabia", "USA", "Brazil", "Sweden", "China", "Chile", "Netherlands"]
+ports = ["Shanghai", "Singapore", "Shenzhen", "Busan", "Rotterdam", "Hamburg", "New York", "Durban"]
+resources = ["CH4", "H2", "CO2", "Biomass"]
+methods = ["Fossil", "Biomass", "Electric"]
 
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
+C = countries
+K = ports
+R = resources
+P = methods
+R_prime = [r for r in R if r != "Biomass"]
 
-# SageMath parsed files
-*.sage.py
+# Variables
+x = model.addVars(C, C, R, name="x", lb=0, ub=1)             
+M = model.addVars(C, P, name="M", lb=0)                    
+F = model.addVars(C, K, name="F", lb=0)                      
+Mi = model.addVars(C, name="Mi")
 
-# Environments
-.env
-.envrc
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
 
-# Spyder project settings
-.spyderproject
-.spyproject
+# Objective Function
+model.setObjective(
+    gp.quicksum(e_trans[i, j, r] * X_param[i, r] * x[i, j, r] for i in C for j in C for r in R) +
+    gp.quicksum(e_prod[i, p] * M[i, p] for i in C for p in P) +
+    gp.quicksum(e_meoh[i, k] * F[i, k] for i in C for k in K),
+    GRB.MINIMIZE
+)
 
-# Rope project settings
-.ropeproject
+#Setting x=0 for non transportable resources
+for r in non_transportable_resources:
+    for i in C:
+        for j in C:
+            if i != j:
+                model.addConstr(x[i, j, r] == 0, name=f"non_transport_{i}_{j}_{r}")
+#Constraints
+for j in C:
+    for r in R_prime:
+        model.addConstr(
+            X_param[j, r] + gp.quicksum(X_param[i, r] * x[i, j, r] for i in C) -
+            gp.quicksum(X_param[j, r] * x[j, i, r] for i in C) >=
+            gp.quicksum(lam[j, r, p] * M[j, p] for p in P if (j, r, p) in lam)
+        )
 
-# mkdocs documentation
-/site
+for i in C:
+    model.addConstr(
+        gp.quicksum(M[i, p] for p in P) == gp.quicksum(F[i, k] for k in K))
 
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
+for k in K:
+    model.addConstr(gp.quicksum(F[i, k] for i in C) == D[k])
 
-# Pyre type checker
-.pyre/
 
-# pytype static type analyzer
-.pytype/
+model.optimize()
 
-# Cython debug symbols
-cython_debug/
 
-# PyCharm
-#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
-#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
-#  and can be added to the global gitignore or merged into this file.  For a more nuclear
-#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
-#.idea/
 
-# Abstra
-# Abstra is an AI-powered process automation framework.
-# Ignore directories containing user credentials, local state, and settings.
-# Learn more at https://abstra.io/docs
-.abstra/
 
-# Visual Studio Code
-#  Visual Studio Code specific template is maintained in a separate VisualStudioCode.gitignore 
-#  that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
-#  and can be added to the global gitignore or merged into this file. However, if you prefer, 
-#  you could uncomment the following to ignore the entire vscode folder
-# .vscode/
 
-# Ruff stuff:
-.ruff_cache/
 
-# PyPI configuration file
-.pypirc
+#Sensitivity analyses
 
-# Cursor
-#  Cursor is an AI-powered code editor. `.cursorignore` specifies files/directories to
-#  exclude from AI features like autocomplete and code analysis. Recommended for sensitive data
-#  refer to https://docs.cursor.com/context/ignore-files
-.cursorignore
-.cursorindexingignore
+# Subsidy sensitivity analysis
+#Thresholds and regions
+thresholds = [800, 700, 600, 550, 500, 450, 400, 350, 300, 250]
+regions_to_ports = {
+    "EU": ["Rotterdam", "Hamburg"],
+    "US": ["New York"],
+    "GS": ["Shanghai", "Singapore", "Shenzhen", "Busan", "Durban"]
+}
 
-# Marimo
-marimo/_static/
-marimo/_lsp/
-__marimo__/
+results_total = []
+results_region = {"EU": [], "US": [], "GS": []}
+
+for region_name, ports_to_test in regions_to_ports.items():
+    for threshold in thresholds:
+        # Model
+        model = gp.Model()
+        # Variables
+        x = model.addVars(C, C, R, name="x", lb=0, ub=1)             
+        M = model.addVars(C, P, name="M", lb=0)                    
+        F = model.addVars(C, P, K, name="F", lb=0)                      
+        Mi = model.addVars(C, name="Mi")                             
+        
+        # <insert model parameters here>
+
+        #Setting x=0 for non transportable resources
+        for r in non_transportable_resources:
+            for i in C:
+                for j in C:
+                    if i != j:
+                        model.addConstr(x[i, j, r] == 0, name=f"non_transport_{i}_{j}_{r}")
+
+        # Constraints
+        for j in C:
+            for r in R_prime:
+                model.addConstr(
+                    X_param[j, r] + gp.quicksum(X_param[i, r] * x[i, j, r] for i in C) -
+                    gp.quicksum(X_param[j, r] * x[j, i, r] for i in C) >=
+                    gp.quicksum(lam[j, r, p] * M[j, p] for p in P if (j, r, p) in lam)
+                )
+
+        for i in C:
+            for p in P:
+                model.addConstr(M[i, p] == gp.quicksum(F[i, p, k] for k in K), name=f"prod_flow_link_{i}_{p}")
+
+        for k in K:
+            model.addConstr(gp.quicksum(F[i, p, k] for p in P for i in C) >= D[k])
+
+        # Policy constraint
+        for region, ports in regions_to_ports.items():
+            for k in ports:
+                rhs = threshold * D[k] if region == region_name else 1e6 * D[k]
+                cost = gp.quicksum(F[i, p, k] * (c_prod[i, p] + c_meoh[i, k]) for i in C for p in P)
+                model.addConstr(cost <= rhs, name=f"{region}_{k}_cost_limit")
+        # Objective function
+        model.setObjective(
+            gp.quicksum(e_trans[i, j, r] * X_param[i, r] * x[i, j, r] for i in C for j in C for r in R) +
+            gp.quicksum(e_prod[i, p] * M[i, p] for i in C for p in P) +
+            gp.quicksum(e_meoh[i, k] * gp.quicksum(F[i, p, k] for p in P) for i in C for k in K),
+            gp.GRB.MINIMIZE
+        )
+
+        model.setParam('OutputFlag', 0)
+        model.optimize()
+
+
+
+
+
+# F-MeOH limit sensitivity analysis
+#Thresholds and regions
+thresholds = [1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.0]
+regions_to_ports = {
+    "EU": ["Rotterdam", "Hamburg"],
+    "US": ["New York"],
+    "GS": ["Shanghai", "Singapore", "Shenzhen", "Busan", "Durban"]
+}
+
+results_total = []
+results_region = {"EU": [], "US": [], "GS": []}
+
+for region_name, ports_to_test in regions_to_ports.items():
+    for threshold in thresholds:
+        # Model
+        model = gp.Model()
+        # Variables
+        x = model.addVars(C, C, R, name="x", lb=0, ub=1)             
+        M = model.addVars(C, P, name="M", lb=0)                    
+        F = model.addVars(C, P, K, name="F", lb=0)                      
+        Mi = model.addVars(C, name="Mi")                             
+        
+        # <insert model parameters here>
+        
+        #Setting x=0 for non transportable resources
+        for r in non_transportable_resources:
+            for i in C:
+                for j in C:
+                    if i != j:
+                        model.addConstr(x[i, j, r] == 0, name=f"non_transport_{i}_{j}_{r}")
+
+        # Constraints
+        for j in C:
+            for r in R_prime:
+                model.addConstr(
+                    X_param[j, r] + gp.quicksum(X_param[i, r] * x[i, j, r] for i in C) -
+                    gp.quicksum(X_param[j, r] * x[j, i, r] for i in C) >=
+                    gp.quicksum(lam[j, r, p] * M[j, p] for p in P if (j, r, p) in lam)
+                )
+
+        for i in C:
+            for p in P:
+                model.addConstr(M[i, p] == gp.quicksum(F[i, p, k] for k in K), name=f"prod_flow_link_{i}_{p}")
+
+        for k in K:
+            model.addConstr(gp.quicksum(F[i, p, k] for p in P for i in C) >= D[k])
+
+        # Policy constraint
+        for k in ports_to_test:
+            fossil_flow = gp.quicksum(F[i, "Fossil", k] for i in C)
+            model.addConstr(fossil_flow <= threshold * D[k], name=f"fossil_limit_{k}")
+
+        # Objective function
+        model.setObjective(
+            gp.quicksum(c_ship[i, j, r] * x[i, j, r] * Xj[i, r] for i in C for j in C for r in resources_with_transport)+
+            gp.quicksum(c_prod[i, p] * M[i, p] for i in C for p in P) +
+            gp.quicksum(c_meoh[i, k] * gp.quicksum(F[i, p, k] for p in P) for i in C for k in K),
+            GRB.MINIMIZE
+        )
+
+        model.setParam('OutputFlag', 0)
+        model.optimize()
+
+
+
+
+# Domestic supply requirement sensitivity analysis (for emissions, change cost parameters to emissions like in the preivous code)
+#Thresholds and regions
+thresholds = [1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.0]
+regions_to_ports = {
+    "EU": ["Rotterdam", "Hamburg"],
+    "US": ["New York"],
+    "GS": ["Shanghai", "Singapore", "Shenzhen", "Busan", "Durban"]
+}
+
+regions_to_countries = {
+            "EU": ["Netherlands", "Sweden"],
+            "US": ["USA"],
+            "GS": ["Russia", "Saoudi-Arabia", "Brazil", "China", "Chile"]   
+            }   
+
+results_total = []
+results_region = {"EU": [], "US": [], "GS": []}
+
+for region_name, ports_to_test in regions_to_ports.items():
+    for threshold in thresholds:
+        # Model
+        model = gp.Model()
+        # Variables
+        x = model.addVars(C, C, R, name="x", lb=0, ub=1)             
+        M = model.addVars(C, P, name="M", lb=0)                    
+        F = model.addVars(C, P, K, name="F", lb=0)                      
+        Mi = model.addVars(C, name="Mi")                             
+        
+        # <insert model parameters here>
+        
+        #Setting x=0 for non transportable resources
+        for r in non_transportable_resources:
+            for i in C:
+                for j in C:
+                    if i != j:
+                        model.addConstr(x[i, j, r] == 0, name=f"non_transport_{i}_{j}_{r}")
+
+        # Constraints
+        for j in C:
+            for r in R_prime:
+                model.addConstr(
+                    X_param[j, r] + gp.quicksum(X_param[i, r] * x[i, j, r] for i in C) -
+                    gp.quicksum(X_param[j, r] * x[j, i, r] for i in C) >=
+                    gp.quicksum(lam[j, r, p] * M[j, p] for p in P if (j, r, p) in lam)
+                )
+
+        for i in C:
+            for p in P:
+                model.addConstr(M[i, p] == gp.quicksum(F[i, p, k] for k in K), name=f"prod_flow_link_{i}_{p}")
+
+        for k in K:
+            model.addConstr(gp.quicksum(F[i, p, k] for p in P for i in C) >= D[k])
+
+        # Policy constraint
+        region_countries = regions_to_countries[region_name]
+        for k in ports_to_test:
+            l1 = gp.quicksum(F[i, p, k] for i in region_countries for p in P)
+            r1 = threshold * gp.quicksum(F[i, p, k] for i in C for p in P)
+            model.addConstr(l1 >= r1, name=f"regional_{region_name}_{k}")
+
+        # Objective function
+        model.setObjective(
+            gp.quicksum(c_ship[i, j, r] * x[i, j, r] * Xj[i, r] for i in C for j in C for r in resources_with_transport)+
+            gp.quicksum(c_prod[i, p] * M[i, p] for i in C for p in P) +
+            gp.quicksum(c_meoh[i, k] * gp.quicksum(F[i, p, k] for p in P) for i in C for k in K),
+            GRB.MINIMIZE
+        )
+
+        model.setParam('OutputFlag', 0)
+        model.optimize()
