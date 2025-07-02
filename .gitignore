@@ -62,6 +62,8 @@ model.optimize()
 
 
 
+
+
 #Emission minimization
 
 
@@ -119,6 +121,8 @@ for k in K:
 
 
 model.optimize()
+
+
 
 
 
@@ -331,3 +335,125 @@ for region_name, ports_to_test in regions_to_ports.items():
 
         model.setParam('OutputFlag', 0)
         model.optimize()
+
+
+
+
+
+
+
+#Pareto front code (Multi Objective Optimization)
+
+
+countries = ["Russia", "Saoudi-Arabia", "USA", "Brazil", "Sweden", "China", "Chile", "Netherlands"]
+ports = ["Shanghai", "Singapore", "Shenzhen", "Busan", "Rotterdam", "Hamburg", "New York", "Durban"]
+resources = ["CH4", "H2", "CO2", "Biomass"]
+methods = ["Fossil", "Biomass", "Electric"]
+
+C = countries
+K = ports
+R = resources
+P = methods
+R_prime = [r for r in R if r != "Biomass"]
+
+# Storage for Pareto solutions
+pareto_cost = []
+pareto_emission = []
+
+# <insert model parameters here>
+
+# Step 1: Solve emission minimization to get lower bound
+model = gp.Model("ParetoFront")
+x = model.addVars(C, C, R, name="x", lb=0, ub=1)
+M = model.addVars(C, P, name="M", lb=0)
+F = model.addVars(C, K, name="F", lb=0)
+Mi = model.addVars(C, name="Mi")
+
+emission_expr = (
+    gp.quicksum(e_trans[i, j, r] * X_param[i, r] * x[i, j, r] for i in C for j in C for r in R_prime) +
+    gp.quicksum(e_prod[i, p] * M[i, p] for i in C for p in P) +
+    gp.quicksum(e_meoh[i, k] * F[i, k] for i in C for k in K)
+)
+
+model.setObjective(emission_expr, GRB.MINIMIZE)
+
+# Setting x=0 for non transportable resources
+non_transportable_resources = ["H2", "Biomass"]
+
+for r in non_transportable_resources:
+    for i in C:
+        for j in C:
+            if i != j:
+                model.addConstr(x[i, j, r] == 0, name=f"non_transport_{i}_{j}_{r}")
+
+# Constraints
+for j in C:
+    for r in R_prime:
+        model.addConstr(
+            X_param[j, r] + gp.quicksum(X_param[i, r] * x[i, j, r] for i in C) -
+            gp.quicksum(X_param[j, r] * x[j, i, r] for i in C) >=
+            gp.quicksum(lam[j, r, p] * M[j, p] for p in P if (j, r, p) in lam)
+        )
+
+for i in C:
+    model.addConstr(gp.quicksum(M[i, p] for p in P) == Mi[i])
+    model.addConstr(gp.quicksum(F[i, k] for k in K) == Mi[i])
+
+for k in K:
+    model.addConstr(gp.quicksum(F[i, k] for i in C) == D[k])
+
+model.optimize()
+min_emission = model.ObjVal
+
+
+
+# Step 2: ε-constraint optimization varying emission thresholds
+epsilons = np.linspace(min_emission*1.000000001, min_emission*6, 300)
+
+for eps in epsilons:
+    # Model
+    model = gp.Model("ParetoFront")
+    x = model.addVars(C, C, R, name="x", lb=0, ub=1)
+    M = model.addVars(C, P, name="M", lb=0)
+    F = model.addVars(C, K, name="F", lb=0)
+    Mi = model.addVars(C, name="Mi")
+
+    emission_expr = (
+        gp.quicksum(e_trans[i, j, r] * X_param[i, r] * x[i, j, r] for i in C for j in C for r in R_prime) +
+        gp.quicksum(e_prod[i, p] * M[i, p] for i in C for p in P) +
+        gp.quicksum(e_meoh[i, k] * F[i, k] for i in C for k in K)
+    )
+    cost_expr = (
+        gp.quicksum(c_ship[i, j, r] * x[i, j, r] * X_param[i, r] for i in C for j in C for r in R_prime) +
+        gp.quicksum(c_prod[i, p] * M[i, p] for i in C for p in P) +
+        gp.quicksum(c_meoh[i, k] * F[i, k] for i in C for k in K)
+    )
+
+    model.setObjective(cost_expr, GRB.MINIMIZE)
+    model.addConstr(emission_expr <= eps)
+
+    for j in C:
+        for r in R_prime:
+            model.addConstr(
+                X_param[j, r] + gp.quicksum(X_param[i, r] * x[i, j, r] for i in C) -
+                gp.quicksum(X_param[j, r] * x[j, i, r] for i in C) >=
+                gp.quicksum(lam[j, r, p] * M[j, p] for p in P if (j, r, p) in lam)
+            )
+
+    # Setting x=0 for non transportable resources
+    non_transportable_resources = ["H2", "Biomass"]
+
+    for r in non_transportable_resources:
+        for i in C:
+            for j in C:
+                if i != j:
+                    model.addConstr(x[i, j, r] == 0, name=f"non_transport_{i}_{j}_{r}")
+
+    for i in C:
+        model.addConstr(gp.quicksum(M[i, p] for p in P) == Mi[i])
+        model.addConstr(gp.quicksum(F[i, k] for k in K) == Mi[i])
+
+    for k in K:
+        model.addConstr(gp.quicksum(F[i, k] for i in C) == D[k])
+    
+    model.optimize()
